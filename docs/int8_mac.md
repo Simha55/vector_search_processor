@@ -1,4 +1,4 @@
-# Module 3: signed INT8 multiply-accumulate (MAC)
+# Signed INT8 multiply-accumulate (MAC)
 
 A MAC combines multiplication and accumulation. For every rising clock edge
 where enable is high and reset/clear are low, it performs:
@@ -78,8 +78,9 @@ sum before it is used.
 
 The design accepts one pair per enabled cycle in simulation; achievable clock
 frequency has not been measured by synthesis or timing analysis. There is no
-ready/valid interface, dimension counter, done flag, or query memory yet. A
-future controller will supply the pairs, count them, and mark the final score.
+ready/valid interface, dimension counter, done flag, or query memory in this
+primitive. int8_cosine_accumulator supplies pairs and enable signals; the queued
+service controls the overall search.
 The fixed-width sum wraps on 64-bit overflow; it has no overflow flag.
 
 ## Worked dot product

@@ -1,8 +1,8 @@
-# Module 2: signed INT8 product accumulator
+# Signed INT8 product accumulator
 
 An accumulator stores a running total. This module accepts the signed 16-bit
 output of the INT8 multiplier and adds it to a signed 64-bit register.
-It is separate from the multiplier for now; no top-level connection is implemented.
+It is instantiated by int8_mac, which is used by the queued service's parallel accumulator.
 
 ## Ports
 
@@ -20,8 +20,8 @@ They must be high at a rising clock edge. Priority is reset, then clear, then
 enable, then hold. Clear and enable together clear the sum and discard that
 edge's product. Clear one edge before accepting the first product of a vector.
 The sum has no defined startup value until a reset or clear clock edge occurs.
-This module has no ready/valid handshake or done output; the future controller
-will supply enable only when a product should be consumed and count elements.
+This module has no ready/valid handshake or done output. The parallel accumulator
+controls enable and element counting; the MAC passes accepted products to it.
 
 ## Every source line explained
 
