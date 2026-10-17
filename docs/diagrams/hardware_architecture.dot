@@ -1,0 +1,62 @@
+digraph architecture {
+  graph [rankdir=TB, bgcolor="white", pad="0.42", nodesep="0.55", ranksep="0.55", splines=polyline,
+         fontname="DejaVu Sans", fontsize=25, labelloc=t,
+         label=<<B>PARALLEL COSINE VECTOR SEARCH</B><BR/><FONT POINT-SIZE="13" COLOR="#64748B">Default configuration: 64 dimensions · 8 lanes · 1,000 queued queries · top-5 results</FONT>>];
+  node [shape=box, style="rounded,filled", fillcolor="white", color="#CBD5E1", penwidth=1.4,
+        fontname="DejaVu Sans", fontsize=12, fontcolor="#172B4D", margin="0.18,0.16"];
+  edge [color="#475569", penwidth=1.8, arrowsize=0.75, fontname="DejaVu Sans", fontsize=10, fontcolor="#64748B"];
+
+  subgraph cluster_inputs {
+    label=<<B>STORE &amp; PREFETCH</B>>; fontsize=13; fontcolor="#334155";
+    color="#E2E8F0"; style="rounded,filled"; fillcolor="#FAFCFF"; margin=20;
+    query [label=<<B>Query input</B><BR/><FONT POINT-SIZE="10">INT8 vectors + request IDs</FONT>>, fillcolor="#EFF6FF", color="#93C5FD"];
+    fifo [label=<<B>Complete-query FIFO</B><BR/><FONT POINT-SIZE="10">1,000 slots · preserves request IDs</FONT>>, fillcolor="#DBEAFE", color="#60A5FA"];
+    database [label=<<B>Resident vector database</B><BR/><FONT POINT-SIZE="10">Host-loaded INT8 vectors</FONT>>, fillcolor="#ECFDF5", color="#6EE7B7"];
+    banks [shape=plain, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="10" COLOR="#34D399" BGCOLOR="#ECFDF5">
+      <TR><TD COLSPAN="2"><B>Ping-pong prefetch</B></TD></TR>
+      <TR><TD BORDER="1" COLOR="#A7F3D0" BGCOLOR="#D1FAE5"><B>Bank A</B><BR/><FONT POINT-SIZE="10">One vector</FONT></TD><TD BORDER="1" COLOR="#A7F3D0" BGCOLOR="#D1FAE5"><B>Bank B</B><BR/><FONT POINT-SIZE="10">One vector</FONT></TD></TR>
+      <TR><TD COLSPAN="2"><FONT POINT-SIZE="10">Fill one while consuming the other</FONT></TD></TR>
+    </TABLE>>];
+    query -> fifo [label="enqueue"];
+    database -> banks [label="pipelined reads"];
+    {rank=same;query;database;}
+    {rank=same;fifo;banks;}
+  }
+
+  subgraph cluster_compute {
+    label=<<B>PROCESSING &amp; CONTROL</B>>; fontsize=13; fontcolor="#334155";
+    color="#E2E8F0"; style="rounded,filled"; fillcolor="#FFFEFA"; margin=20;
+    mac [shape=plain, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="10" COLOR="#A78BFA" BGCOLOR="#F5F3FF">
+      <TR><TD COLSPAN="3"><B>8 parallel arithmetic lanes</B></TD></TR>
+      <TR><TD BORDER="1" COLOR="#DDD6FE"><B>q × d</B><BR/><FONT POINT-SIZE="10">Dot MAC</FONT></TD><TD BORDER="1" COLOR="#DDD6FE"><B>q × q</B><BR/><FONT POINT-SIZE="10">Query MAC</FONT></TD><TD BORDER="1" COLOR="#DDD6FE"><B>d × d</B><BR/><FONT POINT-SIZE="10">DB MAC</FONT></TD></TR>
+      <TR><TD COLSPAN="3"><FONT POINT-SIZE="10">3 MACs per lane · 24 MACs total</FONT></TD></TR>
+    </TABLE>>];
+    reduction [label=<<B>Registered reduction trees</B><BR/><BR/><FONT POINT-SIZE="11">P = Σ(q × d)<BR/>Q = Σ(q²)<BR/>D = Σ(d²)</FONT>>, fillcolor="#EDE9FE", color="#A78BFA"];
+    normalize [label=<<B>Cosine normalizer</B><BR/><BR/><FONT POINT-SIZE="12">P / √(Q × D)</FONT><BR/><BR/><FONT POINT-SIZE="10">64 sqrt + 126 divide stages<BR/>Multiple vector scores in flight<BR/>Signed Q2.30 output</FONT>>, fillcolor="#FFF7ED", color="#FDBA74"];
+    controller [label=<<B>Search controller</B><BR/><FONT POINT-SIZE="10">queued_cosine_search.v<BR/>Schedules queries<BR/>Coordinates handshakes and banks</FONT>>, fillcolor="#F1F5F9", color="#94A3B8"];
+    {rank=same;mac;reduction;}
+    {rank=same;controller;normalize;}
+    mac -> reduction [label="lane sums"];
+    reduction -> normalize [label="P, Q, D + vector ID"];
+  }
+
+  subgraph cluster_output {
+    label=<<B>RANK &amp; RETURN</B>>; fontsize=13; fontcolor="#334155";
+    color="#E2E8F0"; style="rounded,filled"; fillcolor="#FAFCFF"; margin=20;
+    topk [label=<<B>Top-K tracker</B><BR/><FONT POINT-SIZE="10">Highest scores first<BR/>Smaller ID wins ties</FONT>>, fillcolor="#E0F2FE", color="#7DD3FC"];
+    results [label=<<B>Result stream</B><BR/><FONT POINT-SIZE="10">Request ID · rank<BR/>Document ID · cosine score<BR/>Count · last · status</FONT>>, fillcolor="#DCFCE7", color="#86EFAC"];
+    {rank=same;topk;results;}
+    topk -> results [label="top-5"];
+  }
+
+  fifo -> mac [label="8 query elements"];
+  banks -> mac [label="8 database elements"];
+  normalize -> topk [label="score + vector ID"];
+
+  controller -> fifo [style=dashed, color="#94A3B8", penwidth=1, constraint=false];
+  controller -> banks [style=dashed, color="#94A3B8", penwidth=1, constraint=false];
+  controller -> mac [style=dashed, color="#94A3B8", penwidth=1, constraint=false];
+  controller -> topk [style=dashed, color="#94A3B8", penwidth=1, constraint=false];
+
+  graph [labeljust=l];
+}

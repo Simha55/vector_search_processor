@@ -27,6 +27,8 @@ module queued_cosine_search #(
     output wire [31:0] normalizer_inflight
 );
     localparam integer WIDTH=LANES*8, CHUNKS=(DIMENSIONS+LANES-1)/LANES;
+    // Explicit port width without a SystemVerilog size cast.
+    localparam [15:0] VECTOR_DIMENSIONS=DIMENSIONS;
     localparam [2:0] IDLE=0, START_FETCH=1, COMMAND=2, STREAM=3, DRAIN=4, RESULT=5;
     reg [2:0] state;
     reg [31:0] active_id, completed_vectors, output_rank;
@@ -83,7 +85,7 @@ module queued_cosine_search #(
     );
     int8_cosine_accumulator #(.LANES(LANES)) accumulator (
         .clk(clk),.reset(reset),.command_valid(!reset && state==COMMAND && fetch_valid),.command_ready(accumulator_ready),
-        .dimensions(16'(DIMENSIONS)),.vector_id(fetch_vector),.pair_valid(fetch_valid && state==STREAM),
+        .dimensions(VECTOR_DIMENSIONS),.vector_id(fetch_vector),.pair_valid(fetch_valid && state==STREAM),
         .pair_ready(pair_ready),.query_data(query_chunk),.database_data(fetch_data),
         .sums_valid(sums_valid),.sums_ready(sums_ready),.dot_sum(dot_sum),
         .query_norm(query_norm),.database_norm(database_norm),.output_id(sums_id)

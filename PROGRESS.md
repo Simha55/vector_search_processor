@@ -84,3 +84,14 @@ query interleaving and device-specific performance optimization are future work.
 
 Current design: docs/QUEUED_VECTOR_DB.md. Test organization: docs/COCOTB_TESTING.md.
 Arithmetic teaching notes: docs/int8_mac.md and docs/int8_accumulator.md.
+
+
+## Plain-Verilog schematic compatibility (2026-10-16)
+
+DigitalJS/Yosys rejected the SystemVerilog size cast `16'(DIMENSIONS)` in the
+queued top-level. Replaced it with `localparam [15:0] VECTOR_DIMENSIONS=DIMENSIONS`
+and connected that constant to the accumulator port. Behavior and width remain
+unchanged. Reproduced the original error locally, then verified all RTL using
+plain `read_verilog` (without -sv), hierarchy checking, proc and check: 0 problems.
+All 10 fast regression cases passed; the long corpus case was not rerun for this
+width-equivalent syntax change. Update the website's source copy to use the fix.
